@@ -55,11 +55,7 @@ jobs:
         run: |
           ASANA_URL="https://app.asana.com/api/1.0/tasks"
           
-          for commit in ${{ toJson(github.event.commits) }}; do
-            MESSAGE=$(echo "$commit" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
-            URL=$(echo "$commit" | grep -o '"url":"[^"]*"' | cut -d'"' -f4)
-            AUTHOR=$(echo "$commit" | grep -o '"author":"[^"]*"' | cut -d'"' -f4)
-            
+          echo '${{ toJson(github.event.commits) }}' | jq -r '.[] | "\(.message)|\(.url)|\(.author.name)"' | while IFS='|' read -r MESSAGE URL AUTHOR; do
             curl -X POST "$ASANA_URL" \
               -H "Authorization: Bearer ${{ secrets.ASANA_API_TOKEN }}" \
               -H "Content-Type: application/json" \

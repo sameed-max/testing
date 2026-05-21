@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - hello-world
 
 jobs:
   sync-to-asana:

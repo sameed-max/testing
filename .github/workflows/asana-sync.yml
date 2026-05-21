@@ -1,0 +1,72 @@
+name: Sync GitHub to Asana
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened]
+  pull_request:
+    types: [opened, edited, closed, reopened, ready_for_review]
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-to-asana:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Issues to Asana
+        if: github.event_name == 'issues'
+        run: |
+          ASANA_URL="https://app.asana.com/api/1.0/tasks"
+          
+          if [[ "${{ github.event.action }}" == "opened" ]]; then
+            curl -X POST "$ASANA_URL" \
+              -H "Authorization: Bearer ${{ secrets.ASANA_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "data": {
+                  "name": "GitHub Issue: ${{ github.event.issue.title }}",
+                  "notes": "Issue #${{ github.event.issue.number }}\nURL: ${{ github.event.issue.html_url }}\n\n${{ github.event.issue.body }}",
+                  "projects": ["${{ secrets.ASANA_PROJECT_ID }}"]
+                }
+              }'
+          fi
+      
+      - name: Sync Pull Requests to Asana
+        if: github.event_name == 'pull_request'
+        run: |
+          ASANA_URL="https://app.asana.com/api/1.0/tasks"
+          
+          if [[ "${{ github.event.action }}" == "opened" ]]; then
+            curl -X POST "$ASANA_URL" \
+              -H "Authorization: Bearer ${{ secrets.ASANA_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "data": {
+                  "name": "GitHub PR: ${{ github.event.pull_request.title }}",
+                  "notes": "Pull Request #${{ github.event.pull_request.number }}\nURL: ${{ github.event.pull_request.html_url }}\nBranch: ${{ github.event.pull_request.head.ref }}\n\n${{ github.event.pull_request.body }}",
+                  "projects": ["${{ secrets.ASANA_PROJECT_ID }}"]
+                }
+              }'
+          fi
+      
+      - name: Sync Commits to Asana
+        if: github.event_name == 'push'
+        run: |
+          ASANA_URL="https://app.asana.com/api/1.0/tasks"
+          
+          for commit in ${{ toJson(github.event.commits) }}; do
+            MESSAGE=$(echo "$commit" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+            URL=$(echo "$commit" | grep -o '"url":"[^"]*"' | cut -d'"' -f4)
+            AUTHOR=$(echo "$commit" | grep -o '"author":"[^"]*"' | cut -d'"' -f4)
+            
+            curl -X POST "$ASANA_URL" \
+              -H "Authorization: Bearer ${{ secrets.ASANA_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"data\": {
+                  \"name\": \"GitHub Commit: $MESSAGE\",
+                  \"notes\": \"Commit by $AUTHOR\nURL: $URL\",
+                  \"projects\": [\"${{ secrets.ASANA_PROJECT_ID }}\"]
+                }
+              }" || true
+          done
